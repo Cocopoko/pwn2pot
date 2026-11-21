@@ -47,9 +47,9 @@ actually work on.
 
 | File | What it is |
 |---|---|
-| `plugin/coco2_hashcat_bridge.py` | The pwnagotchi plugin (Python 3.7+, uses the `requests` library pwnagotchi already ships) |
-| `legion/hashcat_bridge_listener.ps1` | HttpListener + hashcat runner (the PC side) |
-| `legion/install.ps1` | One-time PC setup: token, firewall rule, logon task |
+| `plugin/pwn2pot.py` | The pwnagotchi plugin (Python 3.7+, uses the `requests` library pwnagotchi already ships) |
+| `host/hashcat_bridge_listener.ps1` | HttpListener + hashcat runner (the PC side) |
+| `host/install.ps1` | One-time PC setup: token, firewall rule, logon task |
 | `config.example.toml` | The pwnagotchi config block |
 
 ## Requirements
@@ -79,7 +79,7 @@ actually work on.
 **PC first** — the installer prints the token you need for the Pi:
 
 ```powershell
-# as Administrator, from the legion\ folder
+# as Administrator, from the host\ folder
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
@@ -92,7 +92,7 @@ and starts it.
 
 ```sh
 # copy the plugin into the custom-plugins directory
-sudo cp coco2_hashcat_bridge.py /usr/local/share/pwnagotchi/custom-plugins/
+sudo cp pwn2pot.py /usr/local/share/pwnagotchi/custom-plugins/
 # append the contents of config.example.toml — with your token pasted in —
 # to /etc/pwnagotchi/config.toml, then restart
 sudo systemctl restart pwnagotchi
@@ -100,8 +100,8 @@ sudo systemctl restart pwnagotchi
 
 **Verify**
 
-- Pi: `grep 'hashcat-bridge' /var/log/pwnagotchi.log` shows
-  `[hashcat-bridge] loaded, legion url: http://10.0.0.1:8765/submit`
+- Pi: `grep 'pwn2pot' /var/log/pwnagotchi.log` shows
+  `[pwn2pot] loaded, host url: http://10.0.0.1:8765/submit`
 - PC: `%USERPROFILE%\hashcat-bridge\listener.log` shows
   `hashcat-bridge listener up on port 8765`
 - The first complete handshake she catches appears in the listener
@@ -113,10 +113,10 @@ Plugin options (in `/etc/pwnagotchi/config.toml`):
 
 | Option | Default | Meaning |
 |---|---|---|
-| `main.plugins.coco2_hashcat_bridge.enabled` | `false` | Turn the plugin on |
-| `main.plugins.coco2_hashcat_bridge.legion_url` | `http://10.0.0.1:8765/submit` | Where hashes are POSTed |
-| `main.plugins.coco2_hashcat_bridge.token` | *(none)* | Shared token; must match the PC's `token.txt` |
-| `main.plugins.coco2_hashcat_bridge.hcxpcapngtool` | `/usr/local/bin/hcxpcapngtool` | Converter path on the Pi |
+| `main.plugins.pwn2pot.enabled` | `false` | Turn the plugin on |
+| `main.plugins.pwn2pot.host_url` | `http://10.0.0.1:8765/submit` | Where hashes are POSTed |
+| `main.plugins.pwn2pot.token` | *(none)* | Shared token; must match the PC's `token.txt` |
+| `main.plugins.pwn2pot.hcxpcapngtool` | `/usr/local/bin/hcxpcapngtool` | Converter path on the Pi |
 
 ## What lands where (PC)
 
