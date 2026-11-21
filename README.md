@@ -1,12 +1,17 @@
 # pwn2pot
 
-**coco2 → hashcat, zero hands.** Capture → crack, fully automatic.
+**pwnagotchi → hashcat, zero hands.** Capture → crack, fully automatic.
+
 A pwnagotchi plugin plus a small Windows listener that together remove
 every manual step between a handshake landing on the Pi and hashcat
-finishing with it on the PC — every crack lands in the potfile.
+finishing with it on the PC. When your pwnagotchi catches a *complete*
+WPA handshake, pwn2pot converts it, ships it to your PC, and runs a
+three-pass hashcat pipeline against it — every crack lands in the
+potfile and in `cracked.log`. No scp, no manual conversion, no
+babysitting.
 
 ```
-pwnagotchi (coco2)                     host PC (Legion)
+pwnagotchi                             host PC (Windows)
 ┌───────────────────────┐              ┌──────────────────────────────┐
 │ handshake captured    │              │ listener :8765               │
 │        │              │              │        │                     │
@@ -25,45 +30,93 @@ Partial captures (AP-side M1/M3 frames only) convert to nothing and
 are skipped by design — the bridge only forwards hashes hashcat can
 actually work on.
 
+## Features
+
+- **Fully automatic** — handshake event → conversion → delivery → cracking
+- **Only complete handshakes are forwarded** — `hcxpcapngtool` decides
+- **On-disk spool on the Pi with dedupe** — retried on ready, on
+  internet-available, and on every new handshake until the PC ACKs, so
+  a sleeping or rebooting PC loses nothing
+- **Three-pass pipeline** — quick list → full list → full list + rules,
+  stopping early the moment a hash cracks
+- **Token-authenticated** POSTs, and the installer scopes the Windows
+  firewall rule to the pwnagotchi's IP only
+- **Everything logged**; processed hashes are archived in `done\`
+
 ## Pieces
 
-- `plugin/coco2_hashcat_bridge.py` — the pwnagotchi plugin (Python 3.7+,
-  uses the `requests` library pwnagotchi already ships).
-- `legion/hashcat_bridge_listener.ps1` — HttpListener + hashcat runner.
-- `legion/install.ps1` — one-time PC setup: token, firewall, logon task.
-- `config.example.toml` — the pwnagotchi config block.
+| File | What it is |
+|---|---|
+| `plugin/coco2_hashcat_bridge.py` | The pwnagotchi plugin (Python 3.7+, uses the `requests` library pwnagotchi already ships) |
+| `legion/hashcat_bridge_listener.ps1` | HttpListener + hashcat runner (the PC side) |
+| `legion/install.ps1` | One-time PC setup: token, firewall rule, logon task |
+| `config.example.toml` | The pwnagotchi config block |
 
 ## Requirements
 
-Pi side:
-- pwnagotchi (built/tested on the aluminum-ice fork, v1.8.5)
-- `hcxpcapngtool` (hcxtools) on PATH or at `/usr/local/bin/hcxpcapngtool`
-- The Pi can reach the PC at `10.0.0.1` (USB gadget network, ICS host)
+**Pi side**
 
-PC side:
-- Windows PowerShell 5.1 (built into Windows 10/11)
-- hashcat 6.x in `Downloads\hashcat-6.2.6` (override with `-HashcatDir`)
-- Wordlists in `OneDrive\Desktop\Wordlist-V2` (override with `-WordlistDir`):
-  `Top204Thousand-WPA-probable-v2.txt`, `Top1pt2Million-WPA-probable-v2.txt`,
-  `rule\rockyou-30000.rule`
+- pwnagotchi (built and tested on the aluminum-ice fork, v1.8.5)
+- `hcxpcapngtool` (from hcxtools) at `/usr/local/bin/hcxpcapngtool`
+  (path is configurable)
+- The Pi can reach the PC at `10.0.0.1` (the usual USB gadget /
+  connection-sharing host address)
+
+**PC side**
+
+- Windows 10/11 with PowerShell 5.1 (built in)
+- hashcat 6.x (default location `Downloads\hashcat-6.2.6`,
+  override with `-HashcatDir`)
+- Wordlists (default location `OneDrive\Desktop\Wordlist-V2`,
+  override with `-WordlistDir`): the pipeline expects
+  `Top204Thousand-WPA-probable-v2.txt`,
+  `Top1pt2Million-WPA-probable-v2.txt` and
+  `rule\rockyou-30000.rule` — the WPA-probable v2 lists, or any
+  lists you rename to match
 
 ## Setup
 
-**PC first** (the installer prints the token you need for the Pi):
+**PC first** — the installer prints the token you need for the Pi:
 
 ```powershell
 # as Administrator, from the legion\ folder
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
+This generates the shared token (`%USERPROFILE%\hashcat-bridge\token.txt`),
+adds the firewall rule (inbound TCP 8765, remote address `10.0.0.2`
+only), registers a logon task so the listener starts with Windows,
+and starts it.
+
 **Then the Pi:**
 
 ```sh
 # copy the plugin into the custom-plugins directory
 sudo cp coco2_hashcat_bridge.py /usr/local/share/pwnagotchi/custom-plugins/
-# append config.example.toml (with your token) to /etc/pwnagotchi/config.toml
+# append the contents of config.example.toml — with your token pasted in —
+# to /etc/pwnagotchi/config.toml, then restart
 sudo systemctl restart pwnagotchi
 ```
+
+**Verify**
+
+- Pi: `grep 'hashcat-bridge' /var/log/pwnagotchi.log` shows
+  `[hashcat-bridge] loaded, legion url: http://10.0.0.1:8765/submit`
+- PC: `%USERPROFILE%\hashcat-bridge\listener.log` shows
+  `hashcat-bridge listener up on port 8765`
+- The first complete handshake she catches appears in the listener
+  log as `received hash for '<ssid>'` and the passes follow.
+
+## Configuration
+
+Plugin options (in `/etc/pwnagotchi/config.toml`):
+
+| Option | Default | Meaning |
+|---|---|---|
+| `main.plugins.coco2_hashcat_bridge.enabled` | `false` | Turn the plugin on |
+| `main.plugins.coco2_hashcat_bridge.legion_url` | `http://10.0.0.1:8765/submit` | Where hashes are POSTed |
+| `main.plugins.coco2_hashcat_bridge.token` | *(none)* | Shared token; must match the PC's `token.txt` |
+| `main.plugins.coco2_hashcat_bridge.hcxpcapngtool` | `/usr/local/bin/hcxpcapngtool` | Converter path on the Pi |
 
 ## What lands where (PC)
 
@@ -71,12 +124,31 @@ Everything lives in `%USERPROFILE%\hashcat-bridge\`:
 
 | File | Contents |
 |---|---|
-| `cracked.log` | timestamped cracks (`hash:plain`, `--show` format) |
-| `listener.log` | every receive / pass / crack / error |
-| `bridge.potfile` | the bridge's own hashcat potfile |
-| `seen.txt` | every hash ever received (dedupe) |
-| `inbox\` / `done\` | queued and processed `.22000` files |
-| `token.txt` | the shared bridge token |
+| `cracked.log` | Timestamped cracks (`hash:plain`, `--show` format) |
+| `listener.log` | Every receive / pass / crack / error |
+| `bridge.potfile` | The bridge's own hashcat potfile |
+| `seen.txt` | Every hash ever received (dedupe) |
+| `inbox\` / `done\` | Queued and processed `.22000` files |
+| `token.txt` | The shared bridge token |
+
+## Known limitations
+
+- The listener answers a submission only **after** its hashcat passes
+  finish — and a rules pass can take a while. Senders may time out
+  and retry; dedupe makes retries harmless and nothing is lost. (A
+  reply-first, crack-in-background change is planned.)
+- The listener processes **one hash at a time**, in arrival order.
+- The PC side is **Windows only** (PowerShell + HttpListener).
+
+## Troubleshooting
+
+- **403 from the listener** — token mismatch between the Pi's
+  `config.toml` and the PC's `token.txt`.
+- **Plugin loaded but silent** — normal until a *complete* handshake
+  is captured; partial captures produce no traffic by design.
+- **Nothing received** — check `listener.log`, confirm the scheduled
+  task `hashcat-bridge` is running, and that the Pi can reach
+  `10.0.0.1:8765`.
 
 ## Security notes
 
@@ -84,11 +156,11 @@ Everything lives in `%USERPROFILE%\hashcat-bridge\`:
   rule scopes port 8765 to remote address `10.0.0.2`, and every POST
   must carry the shared token in the `X-Bridge-Token` header.
 - The token is generated at install time and never leaves the two
-  machines — it is not in this repo.
-- Hashes are spooled on the Pi (`/root/hashcat-bridge/spool.jsonl`)
-  and retried on every new handshake, on ready, and whenever internet
-  is detected, so a sleeping PC loses nothing.
+  machines — it is **not** in this repo. The value in
+  `config.example.toml` is a placeholder; never commit your real one.
+- This is a home-LAN tool for your own hardware and your own
+  captures. Use it only on networks you own or are authorised to test.
 
 ## License
 
-GPL3
+GPL-3.0
