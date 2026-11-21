@@ -20,7 +20,7 @@ pwnagotchi                             host PC (Windows)
 │  handshakes yield     │  .22000 line │ hashcat -m 22000 -d 1        │
 │  a hash)              │              │  1. Top204Thousand           │
 │        │              │              │  2. Top1pt2Million           │
-│ spool on disk,        │              │  3. Top1pt2Million + rules   │
+│ spool on disk,        │              │  3. SG list + rules          │
 │ retried until ACKed   │              │        │                     │
 └───────────────────────┘              │ cracks → cracked.log         │
                                        └──────────────────────────────┘
@@ -35,10 +35,14 @@ actually work on.
 - **Fully automatic** — handshake event → conversion → delivery → cracking
 - **Only complete handshakes are forwarded** — `hcxpcapngtool` decides
 - **On-disk spool on the Pi with dedupe** — retried on ready, on
-  internet-available, and on every new handshake until the PC ACKs, so
-  a sleeping or rebooting PC loses nothing
-- **Three-pass pipeline** — quick list → full list → full list + rules,
-  stopping early the moment a hash cracks
+  internet-available, on every new handshake, and on a 5-minute
+  timer until the PC ACKs, so a sleeping or rebooting PC loses
+  nothing
+- **Three-pass pipeline** — quick list → full list → Singapore list
+  + rules, stopping early the moment a hash cracks
+- **Never blocked** — the listener ACKs a submission the moment it
+  is queued and cracks in a background worker; files left in the
+  inbox by a crash or reboot resume automatically at startup
 - **Token-authenticated** POSTs, and the installer scopes the Windows
   firewall rule to the pwnagotchi's IP only
 - **Everything logged**; processed hashes are archived in `done\`
@@ -72,7 +76,10 @@ actually work on.
   `Top204Thousand-WPA-probable-v2.txt`,
   `Top1pt2Million-WPA-probable-v2.txt` and
   `rule\rockyou-30000.rule` — the WPA-probable v2 lists, or any
-  lists you rename to match
+  lists you rename to match. Pass 3 uses a Singapore list
+  (`srwordlist_sg_250.txt`, the SOCRadar SG-250) with the rules when
+  it is present in the same folder, and falls back to the full list
+  + rules when it is not
 
 ## Setup
 
@@ -133,11 +140,8 @@ Everything lives in `%USERPROFILE%\hashcat-bridge\`:
 
 ## Known limitations
 
-- The listener answers a submission only **after** its hashcat passes
-  finish — and a rules pass can take a while. Senders may time out
-  and retry; dedupe makes retries harmless and nothing is lost. (A
-  reply-first, crack-in-background change is planned.)
-- The listener processes **one hash at a time**, in arrival order.
+- The listener cracks **one hash at a time**, in arrival order —
+  submissions keep being accepted and queued while a pass runs.
 - The PC side is **Windows only** (PowerShell + HttpListener).
 
 ## Troubleshooting

@@ -20,6 +20,7 @@ import logging
 import os
 import subprocess
 import threading
+import time
 
 import requests
 
@@ -28,7 +29,7 @@ import pwnagotchi.plugins as plugins
 
 class Pwn2Pot(plugins.Plugin):
     __author__ = 'Cocopoko'
-    __version__ = '1.1.0'
+    __version__ = '1.2.0'
     __license__ = 'GPL3'
     __description__ = ('Converts new handshakes with hcxpcapngtool and ships every crackable '
                        'WPA hash (.22000) straight to a hashcat listener on the host PC. '
@@ -127,6 +128,17 @@ class Pwn2Pot(plugins.Plugin):
                 for e in keep:
                     f.write(json.dumps(e) + '\n')
 
+    def _spool_retry_loop(self):
+        """Re-try the spool every 5 minutes, so a hash that missed its
+        delivery window (host asleep, listener busy, link down) still
+        ships without waiting for the next handshake or reboot."""
+        while True:
+            time.sleep(300)
+            try:
+                self._flush_spool()
+            except Exception:
+                pass
+
     def _process_pcap(self, pcap_path, ssid):
         hcx = self._opt('hcxpcapngtool', self.DEFAULT_HCX)
         if not os.path.exists(hcx):
@@ -176,6 +188,8 @@ class Pwn2Pot(plugins.Plugin):
             pass
         logging.info('[pwn2pot] loaded, host url: %s'
                      % self._opt('host_url', self.DEFAULT_URL))
+        threading.Thread(target=self._spool_retry_loop, daemon=True).start()
+        logging.info('[pwn2pot] spool auto-retry on (every 300s)')
 
     def on_ready(self, agent):
         self._flush_spool()
