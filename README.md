@@ -161,6 +161,17 @@ Everything lives in `%USERPROFILE%\hashcat-bridge\`:
 - This is a home-LAN tool for your own hardware and your own
   captures. Use it only on networks you own or are authorised to test.
 
+## Donations
+
+pwn2pot is free, GPL-3.0, and built in spare hours. If it saved you
+time and you want to throw something in the pot:
+
+**Monero (XMR)**
+
+```
+4875Mj3ZVyXYiwhvcjnbNMWpqocBzyXDnL3bsBmkpJXcYLu4C6epuHwi4HyLwh9AJoJFNjfdxiKQnEHGQB5PKb5hK58mrro
+```
+
 ## License
 
 GPL-3.0
