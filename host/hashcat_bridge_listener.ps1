@@ -11,6 +11,9 @@
 # queued, and cracking runs in a background worker — the listener
 # never sits blocked behind a long pass again. Files left in the
 # inbox by a crash or reboot are resumed automatically at startup.
+# v1.2.1: inbox filenames carry a millisecond + random suffix, so
+# two hashes for the same SSID arriving in the same second can no
+# longer overwrite each other before cracking.
 # Pass 3 uses the Singapore list (SOCradar SG-250) with the
 # rockyou-30000 rules when the list is present in the wordlist
 # folder, and falls back to the full list + rules when it is not.
@@ -202,7 +205,7 @@ while ($listener.IsListening) {
                 Add-Content $SeenFile $hash
                 $ssid = ([string]$data.ssid) -replace '[^\w\- ]', '_'
                 if (!$ssid) { $ssid = 'unknown' }
-                $name = '{0}_{1}.22000' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $ssid
+                $name = '{0}_{1}_{2}.22000' -f (Get-Date -Format 'yyyyMMdd-HHmmss-fff'), $ssid, (Get-Random -Maximum 10000).ToString('0000')
                 $path = Join-Path $Inbox $name
                 Set-Content -Path $path -Value $hash -Encoding ascii
                 $script:Queue.Enqueue($path)
