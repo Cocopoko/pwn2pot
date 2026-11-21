@@ -1,0 +1,8 @@
+# Add to /etc/pwnagotchi/config.toml on the pwnagotchi, then restart
+# the pwnagotchi service. The token must match the one install.ps1
+# generated on the PC (also saved in %USERPROFILE%\hashcat-bridge\token.txt).
+
+main.plugins.coco2_hashcat_bridge.enabled = true
+main.plugins.coco2_hashcat_bridge.legion_url = "http://10.0.0.1:8765/submit"
+main.plugins.coco2_hashcat_bridge.token = "PASTE_TOKEN_FROM_INSTALL"
+main.plugins.coco2_hashcat_bridge.hcxpcapngtool = "/usr/local/bin/hcxpcapngtool"
